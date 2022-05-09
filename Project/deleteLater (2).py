@@ -10,7 +10,7 @@ from pytz import timezone
 
 DBname = "postgres"
 DBuser = "postgres"
-DBpwd = "501Cspsu0507"
+DBpwd = "INPUT PASSWORD"
 TableBreadCrumbName = 'BreadCrumb'
 TableTripName = "Trip"
 Datafile = "filedoesnotexist"
