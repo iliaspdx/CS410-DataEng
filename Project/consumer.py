@@ -9,6 +9,9 @@ from argparse import ArgumentParser, FileType
 from configparser import ConfigParser
 from confluent_kafka import Consumer, OFFSET_BEGINNING
 
+# https://github.com/iliaspdx/CS410-DataEng Under project directory for the github
+
+
 topic = "breadcrumb"
 DBname = "postgres"
 DBuser = "postgres"
@@ -210,6 +213,7 @@ if __name__ == '__main__':
     # Receives the data and store it as a dataframe
     # Transform & validate it and store it into the database
     # Project part 2 
+    # Uncomment the next line below to load the data to a df and to the database
     # get_df_add_to_db()
 
 
