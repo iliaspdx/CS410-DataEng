@@ -26,13 +26,12 @@ today = datetime.datetime.now(pst_tz)
 today = today.strftime('%Y-%m-%d')
 
 
-
 def create_Kafka_consumer_with(config):
     consumer = Consumer(config)
     return consumer
 
 
-def consume_messages_with(consumer, topic = "breadcrumb"):
+def consume_messages_with(consumer, topic):
     # Set up a callback to handle the '--reset' flag.
     def reset_offset(consumer, partitions):
         if args.reset:
@@ -42,7 +41,8 @@ def consume_messages_with(consumer, topic = "breadcrumb"):
     
     # Subscribe to topic
     consumer.subscribe([topic], on_assign=reset_offset)
-    
+   
+    trimet_data = ""
     # Poll for new messages from Kafka and print them.
     try:
         while True:
@@ -63,16 +63,27 @@ def consume_messages_with(consumer, topic = "breadcrumb"):
                 valid_json = re.sub( "(?<={)\'|\'(?=})|(?<=\[)\'|\'(?=\])|\'(?=:)|(?<=: )\'|\'(?=,)|(?<=, )\'", "\"", msg_string)
                 json_data = valid_json
 
-                json_obj = json.loads(json_data)
-                json_formatted = json.dumps(json_obj, indent=2)
-
-                fil = open('{}.txt'.format(today), "a")
-                fil.write(json_formatted)
-                fil.write('\n')
-                fil.close()
+                #Appends the entry to the string
+                trimet_data = trimet_data + json_data
+ 
     except KeyboardInterrupt:
         pass
     finally:
+        # Formatting the trimet data
+        # Add square brackets to the front and end
+        # replace all } with },
+        trimet_data = '[' + trimet_data + ']'
+        trimet_data = trimet_data.replace("}", "},")
+        # replace the last trailing , empty space
+        trimet_data = "".join(trimet_data.rsplit(",", 1))
+        # convert the string to a json obj and insert to text file
+        json_obj = json.loads(trimet_data)
+        json_formatted = json.dumps(json_obj, indent=2)
+        fil = open('{}.txt'.format(today), "a")
+        fil.write(json_formatted)
+        fil.write('\n')
+        fil.close()
+
         # Leave group and commit final offsets
         consumer.close()
 
@@ -207,7 +218,7 @@ if __name__ == '__main__':
     config.update(config_parser['consumer'])
     
     consumer = create_Kafka_consumer_with(config) 
-    consume_messages_with(consumer)
+    consume_messages_with(consumer, topic)
 
     # Receives the data and store it as a dataframe
     # Transform & validate it and store it into the database
