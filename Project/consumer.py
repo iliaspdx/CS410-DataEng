@@ -4,7 +4,7 @@ import re
 import json
 import pandas as pd
 import numpy as np
-from datetime import date
+from datetime import date, timedelta, time
 from argparse import ArgumentParser, FileType
 from configparser import ConfigParser
 from confluent_kafka import Consumer, OFFSET_BEGINNING
@@ -69,20 +69,21 @@ def consume_messages_with(consumer, topic):
     except KeyboardInterrupt:
         pass
     finally:
-        # Formatting the trimet data
-        # Add square brackets to the front and end
-        # replace all } with },
-        trimet_data = '[' + trimet_data + ']'
-        trimet_data = trimet_data.replace("}", "},")
-        # replace the last trailing , empty space
-        trimet_data = "".join(trimet_data.rsplit(",", 1))
-        # convert the string to a json obj and insert to text file
-        json_obj = json.loads(trimet_data)
-        json_formatted = json.dumps(json_obj, indent=2)
-        fil = open('{}.txt'.format(today), "a")
-        fil.write(json_formatted)
-        fil.write('\n')
-        fil.close()
+        if trimet_data != "": 
+            # Formatting the trimet data
+            # Add square brackets to the front and end
+            # replace all } with },
+            trimet_data = '[' + trimet_data + ']'
+            trimet_data = trimet_data.replace("}", "},")
+            # replace the last trailing , empty space
+            trimet_data = "".join(trimet_data.rsplit(",", 1))
+            # convert the string to a json obj and insert to text file
+            json_obj = json.loads(trimet_data)
+            json_formatted = json.dumps(json_obj, indent=2)
+            fil = open('{}.txt'.format(today), "a")
+            fil.write(json_formatted)
+            fil.write('\n')
+            fil.close()
 
         # Leave group and commit final offsets
         consumer.close()
@@ -181,7 +182,68 @@ def fix_date(df):
     df['TIME_STAMP'] = combined_date
     return df
 
-#
+def dbconnect():
+    connection = psycopg2.connect(
+            host="localhost",
+            database=DBname,
+            user=DBuser,
+            password=DBpwd,
+    )
+    connection.autocommit = True
+    return connection
+
+def createTable(conn):
+    with conn.cursor() as cursor:
+        cursor.execute(f"""
+                DROP TABLE IF EXISTS {TableBreadCrumbName};
+                CREATE TABLE {TableBreadCrumbName} 
+                (tstamp TIMESTAMP, 
+                latitude DECIMAL, 
+                longitude DECIMAL, 
+                direction INTEGER, 
+                speed DECIMAL, 
+                trip_id INTEGER);""")
+    print(f"Create {TableBreadCrumbName} Table")
+
+def createTripTable(conn):
+    with conn.cursor() as cursor:
+        cursor.execute(f""" 
+                DROP TABLE IF EXISTS {TableTripName};
+                CREATE TABLE {TableTripName}
+                (trip_id INTEGER,
+                route_id INTEGER,
+                vehicle_id INTEGER,
+                service_id INTEGER,
+                direction INTEGER);""")
+    print(f"Create {TableTripName} Table")
+
+
+
+def load_db(conn, df):
+    with conn.cursor() as cursor:
+        print(f"Loading {len(df)} rows")
+        for index, row in df.iterrows():
+            cursor.execute(f"""
+            INSERT INTO {TableBreadCrumbName}(
+            tstamp, 
+            latitude, 
+            longitude, 
+            direction, 
+            speed, 
+            trip_id) 
+            VALUES ('{df['TIME_STAMP'][index]}', {df['GPS_LATITUDE'][index]}, {df['GPS_LONGITUDE'][index]}, {df['DIRECTION'][index]}, {df['SPEED'][index]}, {df['EVENT_NO_TRIP'][index]});""") 
+            cursor.execute(f"""
+            INSERT INTO {TableTripName} (
+            trip_id,
+            route_id,
+            vehicle_id,
+            service_id,
+            direction)
+            VALUES ({df['EVENT_NO_TRIP'][index]}, 0, {df['VEHICLE_ID'][index]}, 0, 0);""")
+
+
+
+
 def get_df_add_to_db():
     df = load_data()
     df = drop_columns(df)
